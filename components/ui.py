@@ -7,10 +7,10 @@ import traceback
 
 async def fetch_logos(company_names, api_key, _progress_bar):
     logos = []
+    white_logo_brands = []
     progress_step = 1 / len(company_names) if company_names else 1
 
     async with aiohttp.ClientSession() as session:
-        # Search for brands
         search_tasks = [search_company(session, name) for name in company_names]
         search_results = await asyncio.gather(*search_tasks)
 
@@ -63,10 +63,18 @@ async def fetch_logos(company_names, api_key, _progress_bar):
                     else:
                         is_white = is_white_image(logo_content, logo_url.split('.')[-1])
                     logos.append((company_name, logo_url, logo_content, None, is_white))
+                    if is_white:
+                        white_logo_brands.append(company_name)
             else:
                 logos.append((company_name, None, None, "No SVG, PNG, or JPG Logo available", False))
 
             _progress_bar.progress((i + 1) * progress_step)
+        
+        st.toast("Logos have been successfully found and inserted into a folder.")
+        
+        if white_logo_brands:
+            brands_list = ", ".join([f"**{brand}**" for brand in white_logo_brands])
+            st.toast(f"We noticed that you searched and downloaded the following logos: {brands_list}. We just wanted to let you know that these logos are primarily white, so if you don't see them right away, try viewing them against a black background.", icon="🚨")
 
     return logos
 
@@ -98,12 +106,9 @@ def display_ui():
 
     api_key = st.text_input("Enter Your Brandfetch API Key:", type="password", help="Enter your API key obtained from Brandfetch.")
     
-    # Text area for company names
     st.session_state.company_names = st.text_area("Enter Company Names (comma-separated):", value=st.session_state.get("company_names", ""), help="Enter the names of the companies you want to fetch logos for, separated by commas.")
-    # Add the attribution line with styling
     st.markdown('<p style="text-align: right; font-size: 14px; color: gray;">Logos & Search provided by <a href="https://brandfetch.com" style="color: gray;">Brandfetch</a></p>', unsafe_allow_html=True)
 
-    # Initialize session state for fetched data and selected files
     if "logos" not in st.session_state:
         st.session_state.logos = []
     if "selected_files" not in st.session_state:
@@ -111,7 +116,6 @@ def display_ui():
     if "select_all" not in st.session_state:
         st.session_state.select_all = False
 
-    # Place "Clear All" and "Fetch Logos" buttons in the same row, with "Fetch Logos" right-aligned
     col1, col2, col3 = st.columns([3, 9.5, 3])
     with col1:
         if st.button("Clear Text Area"):
@@ -124,7 +128,6 @@ def display_ui():
                 progress_bar = st.progress(0)
                 try:
                     new_logos = asyncio.run(fetch_logos(company_list, api_key, progress_bar))
-                    # Cache logos in session state
                     st.session_state.logos.extend(new_logos)
                     st.session_state.selected_files = []
                     st.session_state.select_all = False
@@ -134,7 +137,6 @@ def display_ui():
             else:
                 st.warning("Please enter both your API key and the company names.")
 
-    # Display previously fetched logos
     if st.session_state.logos:
         st.markdown("##### Cached Logos")
         all_logo_files = []
@@ -150,7 +152,6 @@ def display_ui():
                 st.write(f"### {company_name}")
                 st.write(error)
 
-        # Add a "Select All" checkbox
         st.session_state.select_all = st.checkbox("Select All Logos", st.session_state.select_all)
         if st.session_state.select_all:
             st.session_state.selected_files = [name for name, _, _, _, _ in st.session_state.logos]
@@ -167,9 +168,3 @@ def display_ui():
                 file_name="selected_logos.zip",
                 mime="application/zip"
             )
-        st.toast("Logos have been successfully found and inserted into a folder.")
-        
-        if white_logo_brands:
-            # st.markdown("### Note")
-            brands_list = ", ".join([f"**{brand}**" for brand in white_logo_brands])
-            st.toast(f"We noticed that you searched and downloaded the following logos: {brands_list}. We just wanted to let you know that these logos are primarily white, so if you don't see them right away, try viewing them against a black background.", icon="🚨")
