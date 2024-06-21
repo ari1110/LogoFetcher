@@ -1,0 +1,3 @@
+oriaiohttp==3.9.5
+Pillow==10.3.0
+streamlit==1.36.0
